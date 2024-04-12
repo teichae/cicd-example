@@ -7,7 +7,7 @@ on: #트리거 조건값
 env: #Github Action 내에서 사용할 공개 변수
   APPLICATION: next-apps
   ENVIRONMENT: stage
-  WORKDIR: ./github-action/nextjs
+  WORKDIR: ./nextjs
 
 jobs: #작업 나열
   build_and_deploy:
