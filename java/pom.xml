@@ -1,0 +1,24 @@
+<project xmlns="http://maven.apache.org/POM/4.0.0"
+         xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+         xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/xsd/maven-4.0.0.xsd">
+    <modelVersion>4.0.0</modelVersion>
+
+    <groupId>com.example</groupId>
+    <artifactId>java-static-site</artifactId>
+    <version>1.0-SNAPSHOT</version>
+    <packaging>war</packaging>
+
+    <build>
+        <finalName>${project.artifactId}</finalName>
+        <plugins>
+            <plugin>
+                <groupId>org.apache.maven.plugins</groupId>
+                <artifactId>maven-war-plugin</artifactId>
+                <version>3.4.0</version> <!-- 사용 중인 maven-war-plugin의 버전을 확인하고 필요에 따라 변경하세요 -->
+                <configuration>
+                    <failOnMissingWebXml>false</failOnMissingWebXml> <!-- web.xml 파일의 부재가 빌드 실패를 일으키지 않도록 설정 -->
+                </configuration>
+            </plugin>
+        </plugins>
+    </build>
+</project>

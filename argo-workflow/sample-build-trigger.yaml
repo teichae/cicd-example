@@ -1,0 +1,25 @@
+apiVersion: argoproj.io/v1alpha1
+kind: WorkflowEventBinding
+metadata:
+  name: sample-trigger
+  namespace: argo
+spec:
+  event:
+    selector: payload.action == "closed" && payload.pull_request.merged == true && payload.pull_request.base.ref == "main" && payload.repository.name == "cicd-example"
+  submit:
+    arguments:
+      parameters:
+      - name: repo
+        valueFrom:
+          event: payload.repository.name
+      - name: service-name
+        valueFrom:
+          event: '''cicd-example'''
+      - name: branch
+        valueFrom:
+          event: payload.pull_request.base.ref
+      - name: env
+        valueFrom:
+          event: '''prod'''
+    workflowTemplateRef:
+      name: sample-dags

@@ -1,0 +1,27 @@
+metadata:
+  name: slack-notification-build-start
+  namespace: argo
+spec:
+  templates:
+    - name: slack
+      outputs: {}
+      metadata: {}
+      container:
+        name: ''
+        image: curlimages/curl
+        command:
+          - sh
+          - '-c'
+        args:
+          - >-
+            #!/bin/bash
+            COLOR="good" MESSAGE="빌드 시작합니다." PAYLOAD="{\"attachments\": [{\"color\": \"$COLOR\", \"text\": \"$MESSAGE\"}]}" curl -X POST -H Content-type:application/json --data "$PAYLOAD" $SLACK_WEBHOOK
+        env:
+          - name: SLACK_WEBHOOK
+            valueFrom:
+              secretKeyRef:
+                name: slack-webhook
+                key: token
+        resources: {}
+  entrypoint: slack
+  arguments: {}

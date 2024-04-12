@@ -1,0 +1,59 @@
+metadata:
+  name: gitops-push
+  namespace: argo
+spec:
+  templates:
+    - name: gitops-push
+      inputs:
+        parameters:
+          - name: service-name
+            value: '{{workflow.parameters.service-name}}'
+          - name: branch
+            value: '{{workflow.parameters.branch}}'
+          - name: env
+            value: '{{workflow.parameters.env}}'
+      outputs: {}
+      nodeSelector:
+        karpenter.sh/nodepool: build
+      metadata: {}
+      container:
+        name: ''
+        image: ghcr.io/teichae/argo-ci-builder:v1.0
+        command:
+          - sh
+          - '-c'
+        args:
+          - >-
+            git config --global user.email "user-email" &&
+            git config --global user.name "user name" &&
+            git clone https://$GIT_USERNAME:$GIT_TOKEN@github.com/teichae/cicd-sample/ /opt/workspace/cicd-sample &&
+            cd /opt/workspace/cicd-sample/cd/{{workflow.parameters.service-name}}/env/{{workflow.parameters.env}} &&
+            kustomize edit set image {{workflow.parameters.service-name}}=649325036916.dkr.ecr.ap-northeast-2.amazonaws.com/{{workflow.parameters.service-name}}:{{workflow.parameters.branch}}.{{workflow.name}} &&
+            cd /opt/workspace/cicd-sample &&
+            git add . &&
+            git commit -m 'change to image {{workflow.parameters.application-name}}:{{workflow.parameters.branch}}.{{workflow.name}}' &&
+            git push origin main
+        env:
+          - name: GIT_TOKEN
+            valueFrom:
+              secretKeyRef:
+                name: github-token
+                key: token
+          - name: GIT_USERNAME
+            valueFrom:
+              secretKeyRef:
+                name: github-token
+                key: username
+        resources: {}
+        volumeMounts:
+          - name: workspace
+            mountPath: /opt/workspace
+      volumes:
+        - name: workspace
+          emptyDir: {}
+  entrypoint: gitops-push
+  arguments: {}
+  ttlStrategy:
+    secondsAfterCompletion: 600
+    secondsAfterSuccess: 600
+    secondsAfterFailure: 28800

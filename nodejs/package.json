@@ -1,0 +1,10 @@
+{
+    "name": "nodejs-static-site",
+    "version": "1.0.0",
+    "description": "A simple Node.js project to demonstrate CI/CD for static site deployment",
+    "scripts": {
+      "build": "bash scripts/build.sh"
+    },
+    "author": "",
+    "license": "ISC"
+  }

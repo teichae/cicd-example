@@ -1,0 +1,130 @@
+metadata:
+  name: sample-dags
+  namespace: argo
+spec:
+  templates:
+    - name: main
+      inputs:
+        parameters: #전체 workflow에서 사용할 변수
+          - name: branch
+            value: dev
+          - name: service-name
+            value: '{{workflow.parameters.service-name}}'
+          - name: repo
+            value: '{{workflow.parameters.repo}}'
+          - name: env
+            value: '{{workflow.parameters.env}}'
+      outputs: {}
+      metadata: {}
+      dag: #작업 선언
+        tasks:
+          - name: start-build #작업의 이름
+            arguments: {}
+            templateRef: #불러올 템플릿
+              name: slack-notification-build-start #템플릿의 이름
+              template: slack #템플릿 내의 작업
+          - name: clone
+            arguments:
+              parameters: #해당 workflow에서 받았던 파라미터 값을 해당 작업에서 매칭
+                - name: repo
+                  value: '{{workflow.parameters.repo}}'
+                - name: branch
+                  value: '{{workflow.parameters.branch}}'
+            templateRef:
+              name: git-clone
+              template: git-clone
+            depends: start-build #해당 작업이 마친 후 실행 되도록 지시
+          - name: docker-image-build
+            arguments:
+              parameters:
+                - name: service-name
+                  value: '{{workflow.parameters.service-name}}'
+                - name: branch
+                  value: '{{workflow.parameters.branch}}'
+            templateRef:
+              name: docker-image-build
+              template: docker-image-build
+            depends: build
+          - name: deploy
+            arguments:
+              parameters:
+                - name: service-name
+                  value: '{{workflow.parameters.service-name}}'
+                - name: branch
+                  value: '{{workflow.parameters.branch}}'
+                - name: env
+                  value: '{{workflow.parameters.env}}'
+            templateRef:
+              name: gitops-push
+              template: gitops-push
+            depends: docker-image-build
+          - name: argocd-sync
+            arguments:
+              parameters:
+                - name: service-name
+                  value: '{{workflow.parameters.service-name}}'
+            templateRef:
+              name: argocd-sync
+              template: argocd-sync
+            depends: deploy
+    - name: exit-handler
+      inputs:
+        parameters:
+          - name: branch
+          - name: service-name
+      outputs: {}
+      metadata: {}
+      container:
+        name: ''
+        image: curlimages/curl
+        command:
+          - sh
+          - '-c'
+        args:
+          - >-
+            #!/bin/bash
+
+            if [ {{workflow.status}} == Succeeded ];
+                then
+                COLOR="good"
+                MESSAGE="빌드가 완료 되었습니다."
+                PAYLOAD="{\"attachments\": [{\"color\": \"$COLOR\", \"text\": \"$MESSAGE\"}]}"
+            else
+                COLOR="danger"
+                MESSAGE="빌드가 실패 되었습니다."
+                PAYLOAD="{\"attachments\": [{\"color\": \"$COLOR\", \"text\": \"$MESSAGE\"}]}"
+            fi
+
+            curl -X POST -H Content-type:application/json --data "$PAYLOAD" $SLACK_WEBHOOK
+        env:
+          - name: SLACK_WEBHOOK
+            valueFrom:
+              secretKeyRef:
+                name: slack-webhook
+                key: token
+        resources: {}
+  entrypoint: main
+  arguments:
+    parameters:
+      - name: branch
+        value: dev
+      - name: repo
+        value: https://github.com/teichae/cicd-example
+      - name: service-name
+        value: java
+  volumeClaimTemplates:
+    - metadata:
+        name: work
+        creationTimestamp: null
+      spec:
+        accessModes:
+          - ReadWriteOnce
+        resources:
+          requests:
+            storage: 1Gi
+      status: {}
+  onExit: exit-handler
+  ttlStrategy:
+    secondsAfterCompletion: 600
+    secondsAfterSuccess: 600
+    secondsAfterFailure: 600

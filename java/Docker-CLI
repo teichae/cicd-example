@@ -1,0 +1,9 @@
+#일반 빌드 시
+docker build -t 태그입력 .
+----
+#멀티스테이지 빌드 시
+#docker build를 사용할 경우
+docker build -f Dockerfile-multistage -t 태그입력 .
+
+#docker buildx 사용할 경우
+docker buildx build --load -f Dockerfile-multistage -t 태그입력 .

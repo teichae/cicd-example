@@ -1,0 +1,72 @@
+metadata:
+  name: argocd-sync-api
+  namespace: argo
+spec:
+  templates:
+    - name: argocd-sync
+      inputs:
+        parameters:
+          - name: argocd-version
+            value: v2.6.15
+          - name: revision
+            value: HEAD
+          - name: flags
+            value: '--'
+          - name: argocd-server-address
+            value: argocd-server.argocd
+          - name: service-name
+            value: '{{workflow.parameters.service-name}}'
+      outputs: {}
+      nodeSelector:
+        karpenter.sh/nodepool: build
+      metadata: {}
+      script:
+        name: ''
+        image: argoproj/argocd:{{workflow.parameters.argocd-version}}
+        command:
+          - bash
+        env:
+          - name: ARGOCD_AUTH_TOKEN
+            valueFrom:
+              secretKeyRef:
+                name: argocd-credentials-secret
+                key: token
+          - name: ARGOCD_USERNAME
+            valueFrom:
+              secretKeyRef:
+                name: argocd-credentials-secret
+                key: username
+          - name: ARGOCD_PASSWORD
+            valueFrom:
+              secretKeyRef:
+                name: argocd-credentials-secret
+                key: password
+          - name: ARGOCD_SERVER
+            value: '{{workflow.parameters.argocd-server-address}}'
+        resources: {}
+        source: >
+          #!/bin/bash
+          set -euo pipefail
+
+          if [[ -z $ARGOCD_AUTH_TOKEN ]] && [[ -z "$ARGOCD_USERNAME" || -z
+          "$ARGOCD_PASSWORD" ]]; then
+            echo "ARGOCD_AUTH_TOKEN이 지정되어야 하거나, ARGOCD_USERNAME/ARGOCD_PASSWORD가 지정되어야 합니다"
+            exit 1
+          fi
+
+
+          if [ -z $ARGOCD_AUTH_TOKEN ]; then
+            yes | argocd login "$ARGOCD_SERVER" --username=$ARGOCD_USERNAME --password=$ARGOCD_PASSWORD {{workflow.parameters.flags}}
+          fi
+
+          echo "Running as ArgoCD User:"
+
+          argocd account get-user-info --insecure
+
+          argocd app sync {{workflow.parameters.service-name}} --insecure
+  entrypoint: argocd-sync
+  arguments: {}
+  ttlStrategy:
+    secondsAfterCompletion: 600
+    secondsAfterSuccess: 600
+    secondsAfterFailure: 600

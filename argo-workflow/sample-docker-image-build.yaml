@@ -1,0 +1,55 @@
+metadata:
+  name: docker-image-build
+  namespace: argo
+spec:
+  templates:
+    - name: docker-image-build
+      inputs:
+        parameters:
+          - name: service-name
+            value: '{{workflow.parameters.service-name}}'
+          - name: branch
+            value: '{{workflow.parameters.branch}}'
+      outputs: {}
+      nodeSelector:
+        karpenter.sh/nodepool: build
+      metadata: {}
+      container:
+        name: ''
+        image: gcr.io/kaniko-project/executor:v1.22.0
+        args:
+          - '--dockerfile=/workspace/java/Dockerfile-multistage' #사용할 Dockerfile 지정
+          - '--context=dir:///workspace' #작업 디렉토리
+          - '--single-snapshot' #컨테이너 레이어 단위마다 빌드하지 않음
+          - '--compressed-caching=false' #압축 캐싱 사용 안함
+          - '--cache=false' #캐시 사용 안함
+          - >-
+            --destination=123456789012.dkr.ecr.ap-northeast-2.amazonaws.com/{{workflow.parameters.service-name}}:{{workflow.parameters.branch}}.{{workflow.name}}
+        resources: {}
+        volumeMounts:
+          - name: work
+            mountPath: /work
+          - name: workspace
+            mountPath: /workspace
+      volumes:
+        - name: workspace
+          emptyDir: {}
+      initContainers:
+        - name: copy-git
+          image: alpine/git
+          command:
+            - sh
+            - '-c'
+          args:
+            - |
+              cp -r /work/checkout/{{workflow.parameters.package-name}}/* /workspace
+          resources: {}
+          mirrorVolumeMounts: true
+      securityContext:
+        fsGroup: 0
+  entrypoint: docker-image-build
+  arguments: {}
+  ttlStrategy:
+    secondsAfterCompletion: 600
+    secondsAfterSuccess: 600
+    secondsAfterFailure: 600

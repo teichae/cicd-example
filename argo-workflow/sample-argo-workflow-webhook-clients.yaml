@@ -1,0 +1,9 @@
+
+apiVersion: v1
+kind: Secret
+metadata:
+  name: argo-workflows-webhook-clients
+  namespace: argo
+data:
+  default: dHlwZTogZ2l0aHViCnNlY3JldDogImNpY2QtZXhhbXBsZSI=
+type: Opaque

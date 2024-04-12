@@ -1,0 +1,82 @@
+name: main-build #작업 이름
+on: #트리거 조건값
+  push:
+    branches:
+      - main
+
+env: #Github Action 내에서 사용할 공개 변수
+  APPLICATION: next-apps
+  ENVIRONMENT: stage
+  WORKDIR: ./github-action/nextjs
+
+jobs: #작업 나열
+  build_and_deploy:
+    runs-on: ubuntu-latest #linux OS 선택
+
+    #AWS IAM Role 사용을 위한 퍼미션 처리
+    permissions:
+        id-token: write
+        contents: read
+
+    steps:
+      #빌드 시작 메시지를 Slack을 통해 발송
+      - name: Start Notification
+        uses: rtCamp/action-slack-notify@v2
+        env:
+          SLACK_USERNAME: "Build Bot"
+          SLACK_WEBHOOK: ${{ secrets.SLACK_WEBHOOK_URL }}
+          SLACK_MESSAGE: "${{ env.APPLICATION }} 의 ${{ env.ENVIRONMENT }} 환경 빌드를 시작합니다."
+          SLACK_COLOR: ${{ job.status }}
+        if: always()
+
+      #특정 Branch의 Source Clone
+      - uses: actions/checkout@v4
+        with:
+          ref: main
+
+      #빌드를 위한 NPM Install
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+      - run: npm install
+        working-directory: ${{ env.WORKDIR }}
+
+      #AWS 인증 처리
+      - name: configure aws credentials
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          role-to-assume: ${{ secrets.AWS_IAM_ROLE }}
+          aws-region: ap-northeast-2
+
+      #NPM Build
+      - name: Build
+        run: npm run build
+        working-directory: ${{ env.WORKDIR }}
+
+      #Build 후 생성된 정적 파일을 S3로 복사 및 이전 파일 삭제
+      - name: Deploy to S3
+        run: aws s3 sync ${{ env.WORKDIR }}/out s3://${{ secrets.STG_AWS_S3_BUCKET_NAME }} --delete
+
+      #Cloudfront의 캐시 무효화 처리
+      - name: Cloudfront invalidate
+        run: aws cloudfront create-invalidation --distribution-id ${{ secrets.STG_CLOUDFRONT_DISTRIBUTION }} --paths "/*"
+
+      #빌드 성공 시 메시지를 Slack을 통해 발송
+      - name: Success Notification
+        uses: rtCamp/action-slack-notify@v2
+        env:
+          SLACK_USERNAME: "Build Bot"
+          SLACK_WEBHOOK: ${{ secrets.SLACK_WEBHOOK_URL }}
+          SLACK_MESSAGE: "${{ env.APPLICATION }} 의 ${{ env.ENVIRONMENT }} 환경 빌드가 성공했습니다."
+          SLACK_COLOR: ${{ job.status }}
+        if: success()
+
+      #빌드 실패 시 메시지를 Slack을 통해 발송
+      - name: Failure Notification
+        uses: rtCamp/action-slack-notify@v2
+        env:
+          SLACK_USERNAME: "Build Bot"
+          SLACK_WEBHOOK: ${{ secrets.SLACK_WEBHOOK_URL }}
+          SLACK_MESSAGE: "${{ env.APPLICATION }} 의 ${{ env.ENVIRONMENT }} 환경 빌드가 실패했습니다."
+          SLACK_COLOR: ${{ job.status }}
+        if: failure()
